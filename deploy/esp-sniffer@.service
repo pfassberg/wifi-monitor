@@ -1,0 +1,16 @@
+[Unit]
+Description=ESP-Sniffer Pure Bash Self-Healing Service on %I
+BindsTo=dev-%i.device
+After=dev-%i.device
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/esp_sniffer_bridge.sh /dev/%I
+Restart=always
+RestartSec=2s
+
+# FIX: Force socat and the bash wrapper to exit instantly when stopped
+KillSignal=SIGKILL
+
+[Install]
+WantedBy=multi-user.target
