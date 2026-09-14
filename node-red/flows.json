@@ -488,7 +488,7 @@
         "type": "comment",
         "z": "3541e9805df4ac60",
         "name": "Commands",
-        "info": "# Activate udev rules:\nsudo udevadm control --reload-rules && sudo udevadm trigger\n\n# Activate systemd script\nsudo systemctl daemon-reload\n\n# Stop socat process for firmware update\nsudo systemctl stop esp-sniffer@ttyACM0.service\n\n# Show status of socat process\nsudo systemctl status esp-sniffer@ttyACM0.service\n",
+        "info": "# Activate udev rules:\nsudo udevadm control --reload-rules && sudo udevadm trigger\n\n# Activate systemd script\nsudo systemctl daemon-reload\n\n# Compile + flash a board and restart its bridge service automatically\n# (no need to stop it or unplug/replug by hand -- see deploy/flash.sh):\n./deploy/flash.sh /dev/ttyACM0\n\n# Show status of socat process\nsudo systemctl status esp-sniffer@ttyACM0.service\n",
         "x": 150,
         "y": 1120,
         "wires": []

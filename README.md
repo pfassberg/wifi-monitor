@@ -56,10 +56,13 @@ starting point for extensions such as deauth-flood or rogue-AP alerting.
 
 ```
 firmware/esp32-sniffer/esp32-sniffer.ino   ESP32 promiscuous-mode sniffer (Arduino/ESP-IDF)
+firmware/esp32-sniffer/fqbn.txt            Board FQBN used by deploy/flash.sh and CI
 node-red/flows.json                        The Node-RED flow (import via the editor menu)
+deploy/flash.sh                            Compile + flash a board via arduino-cli, no unplug/replug needed
 deploy/esp_sniffer_bridge.sh               Serial → TCP bridge (runs on the Node-RED host)
 deploy/99-esp-sniffer.rules                udev rule: auto-start the bridge when the ESP32 is plugged in
 deploy/esp-sniffer@.service                systemd template unit for the bridge script
+.github/workflows/firmware-build.yml       CI: compiles the sketch on every push/PR (build check only)
 package.json                               Node-RED dependency list (node-red-contrib-msg-speed)
 ```
 
@@ -74,15 +77,35 @@ package.json                               Node-RED dependency list (node-red-co
 - Linux with `udev`/`systemd` if you want the bridge to start automatically
   when the ESP32 is plugged in (optional — you can also run
   `esp_sniffer_bridge.sh` manually).
+- [`arduino-cli`](https://arduino.github.io/arduino-cli/) with the ESP32
+  board package installed, if you're using `deploy/flash.sh` (see below).
+  The Arduino IDE works too for a one-off flash, but `deploy/flash.sh`
+  assumes `arduino-cli` since it needs to script the compile/upload.
 
 ## Setup
 
 ### 1. Flash the ESP32
 
-Build and flash `firmware/esp32-sniffer/esp32-sniffer.ino` (Arduino IDE or
-`arduino-cli`, ESP32 board package). It boots into promiscuous mode
-immediately, hopping channels 1–14 every 300 ms, and streams captured
-management frames on the USB serial port at 115200 baud.
+`firmware/esp32-sniffer/fqbn.txt` holds the board's FQBN — check it matches
+your board/core version (`arduino-cli board details -b esp32:esp32:esp32s3`
+lists the available options) before your first flash.
+
+Once the bridge (step 2) is set up and running, flash a board with:
+
+```bash
+./deploy/flash.sh /dev/ttyACM0
+```
+
+This compiles the sketch, stops that device's `esp-sniffer@<device>.service`
+so `esptool` can access the port, flashes, and restarts the service
+afterwards — no manual `systemctl stop`/unplug-replug cycle needed, and it
+works the same way regardless of how many ESP32s are on the hub, since it
+only touches the one device you pass it. Before the bridge is set up, or for
+a one-off flash, `arduino-cli upload`/the Arduino IDE work as normal.
+
+The sketch boots into promiscuous mode immediately, hopping channels 1–14
+every 300 ms, and streams captured management frames on the USB serial port
+at 115200 baud.
 
 Serial commands (type into the same serial connection):
 
@@ -91,6 +114,11 @@ Serial commands (type into the same serial connection):
 - `reset` — reboot the board
 
 The channel range is persisted to NVS and restored on the next boot.
+
+`.github/workflows/firmware-build.yml` compiles the sketch on every push/PR
+that touches `firmware/`, as a build-only check — GitHub-hosted runners have
+no USB access to real hardware, so flashing still has to happen locally via
+`deploy/flash.sh`.
 
 ### 2. Wire up the host bridge (optional but recommended)
 
@@ -119,8 +147,10 @@ Useful commands once installed:
 # Check status
 sudo systemctl status esp-sniffer@ttyACM0.service
 
-# Stop the bridge, e.g. before reflashing the ESP32
+# Stop/start the bridge by hand (deploy/flash.sh does this for you
+# automatically around a flash — see step 1)
 sudo systemctl stop esp-sniffer@ttyACM0.service
+sudo systemctl start esp-sniffer@ttyACM0.service
 ```
 
 Without udev/systemd, you can just run the script by hand:

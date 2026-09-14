@@ -1,0 +1,35 @@
+name: Firmware build
+
+# Compile-only check: GitHub-hosted runners have no USB access to real ESP32
+# hardware, so this catches build breakage but can't flash anything. Flashing
+# still happens locally via deploy/flash.sh.
+
+on:
+  push:
+    paths:
+      - "firmware/**"
+      - ".github/workflows/firmware-build.yml"
+  pull_request:
+    paths:
+      - "firmware/**"
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install arduino-cli
+        uses: arduino/setup-arduino-cli@v2
+
+      - name: Install ESP32 core
+        run: |
+          arduino-cli config init
+          arduino-cli config set board_manager.additional_urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32
+
+      - name: Compile sketch
+        run: |
+          FQBN="$(head -n1 firmware/esp32-sniffer/fqbn.txt)"
+          arduino-cli compile --fqbn "$FQBN" firmware/esp32-sniffer

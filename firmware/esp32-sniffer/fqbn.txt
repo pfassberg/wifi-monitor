@@ -1,0 +1,11 @@
+esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,PartitionScheme=default,PSRAM=disabled
+
+# Single source of truth for the board configuration used by both
+# deploy/flash.sh (local build+flash) and the firmware-build CI workflow.
+#
+# Only the first line is read (everything after the first line is a comment).
+# Adjust it to match your actual board/core version:
+#   arduino-cli board details -b esp32:esp32:esp32s3
+# lists every available menu option (partition scheme, PSRAM, flash size,
+# upload speed, etc.) for the ESP32 core version you have installed —
+# option key names occasionally change between core releases.
