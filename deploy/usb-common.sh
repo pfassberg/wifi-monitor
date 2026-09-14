@@ -25,13 +25,14 @@ find_esp32_devices() {
     done
 }
 
-# Resolves a serial number to its /dev/ttyACMx path. Prints nothing and
-# returns non-zero if no connected ESP32 sniffer has that serial, or it
-# doesn't have an associated tty node (e.g. still enumerating).
+# Resolves a serial number to its /dev/ttyACMx path. Case-insensitive, since
+# these look like MAC addresses and people habitually type them lowercase.
+# Prints nothing and returns non-zero if no connected ESP32 sniffer has that
+# serial, or it doesn't have an associated tty node (e.g. still enumerating).
 find_esp32_device_by_serial() {
-    local target="$1" serial ttyname _syspath
+    local target_lc="${1,,}" serial ttyname _syspath
     while IFS='|' read -r serial ttyname _syspath; do
-        if [[ "$serial" == "$target" ]]; then
+        if [[ "${serial,,}" == "$target_lc" ]]; then
             [[ -n "$ttyname" ]] || return 1
             echo "/dev/$ttyname"
             return 0

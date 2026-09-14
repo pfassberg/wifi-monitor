@@ -51,7 +51,7 @@ while IFS='|' read -r serial ttyname _syspath; do
     device="${ttyname:+/dev/$ttyname}"
     device="${device:-unknown, no tty node found}"
 
-    if grep -qF "ATTRS{serial}==\"$serial\"" "$UDEV_RULES"; then
+    if grep -qiF "ATTRS{serial}==\"$serial\"" "$UDEV_RULES"; then
         echo "    - $serial ($device) already registered"
         continue
     fi

@@ -129,7 +129,7 @@ its device path or its USB serial number (both are printed by
 
 Flashing by serial is handy with several ESP32s on one hub, since which
 `/dev/ttyACMx` a given board lands on can shift across replugs, while its
-serial number doesn't.
+serial number doesn't. Matching is case-insensitive, so lowercase works too.
 
 This compiles the sketch, stops that device's `esp-sniffer@<device>.service`
 so `esptool` can access the port, flashes, and restarts the service
