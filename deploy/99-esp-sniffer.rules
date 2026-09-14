@@ -1,3 +1,6 @@
-# Replace the "serial" attribute below with your own ESP32's USB serial number.
-# Find it with: udevadm info -a -n /dev/ttyACM0 | grep '{serial}' | head -n1
+# deploy/install.sh generates and appends rules like this one automatically
+# (one per connected board) -- run that instead of doing this by hand.
+#
+# For manual setup: replace "serial" below with your ESP32's USB serial
+# number, found with: udevadm info -a -n /dev/ttyACM0 | grep '{serial}' | head -n1
 SUBSYSTEM=="tty", ATTRS{idVendor}=="303a", ATTRS{idProduct}=="1001", ATTRS{serial}=="XX:XX:XX:XX:XX:XX", TAG+="systemd", ENV{SYSTEMD_WANTS}="esp-sniffer@%k.service"

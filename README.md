@@ -58,9 +58,10 @@ starting point for extensions such as deauth-flood or rogue-AP alerting.
 firmware/esp32-sniffer/esp32-sniffer.ino   ESP32 promiscuous-mode sniffer (Arduino/ESP-IDF)
 firmware/esp32-sniffer/fqbn.txt            Board FQBN used by deploy/flash.sh and CI
 node-red/flows.json                        The Node-RED flow (import via the editor menu)
+deploy/install.sh                          Installs the bridge + registers a udev rule per connected ESP32
 deploy/flash.sh                            Compile + flash a board via arduino-cli, no unplug/replug needed
 deploy/esp_sniffer_bridge.sh               Serial → TCP bridge (runs on the Node-RED host)
-deploy/99-esp-sniffer.rules                udev rule: auto-start the bridge when the ESP32 is plugged in
+deploy/99-esp-sniffer.rules                Example udev rule (deploy/install.sh generates these for you)
 deploy/esp-sniffer@.service                systemd template unit for the bridge script
 .github/workflows/firmware-build.yml       CI: compiles the sketch on every push/PR (build check only)
 package.json                               Node-RED dependency list (node-red-contrib-msg-speed)
@@ -148,30 +149,31 @@ no USB access to real hardware, so flashing still has to happen locally via
 
 ### 2. Wire up the host bridge (optional but recommended)
 
-`deploy/esp_sniffer_bridge.sh` reads the ESP32's serial port, prefixes each
+`deploy/esp_sniffer_bridge.sh` reads an ESP32's serial port, prefixes each
 line with a `[TS:<unix-epoch>]` timestamp, and forwards it to Node-RED over
 TCP on port 9990.
 
-To have it start automatically whenever the ESP32 is plugged in:
+To have it start automatically whenever an ESP32 sniffer is plugged in, plug
+in your board(s) and run:
 
 ```bash
-sudo cp deploy/esp_sniffer_bridge.sh /usr/local/bin/esp_sniffer_bridge.sh
-sudo chmod +x /usr/local/bin/esp_sniffer_bridge.sh
-
-sudo cp deploy/esp-sniffer@.service /etc/systemd/system/
-sudo systemctl daemon-reload
-
-# Edit deploy/99-esp-sniffer.rules first: replace the placeholder serial
-# with your board's own (see the comment in that file), then:
-sudo cp deploy/99-esp-sniffer.rules /etc/udev/rules.d/
-sudo udevadm control --reload-rules && sudo udevadm trigger
+sudo ./deploy/install.sh
 ```
+
+This copies `esp_sniffer_bridge.sh` to `/usr/local/bin`, installs the
+`esp-sniffer@.service` systemd template, and adds a udev rule for every
+ESP32 sniffer it finds currently connected (matched by USB vendor/product ID
+and each board's own serial number), then reloads udev so they start right
+away. It's safe to re-run — boards it has already registered are left
+alone — so just plug in another ESP32 and run it again to add that one too;
+no editing udev rules by hand.
 
 Useful commands once installed:
 
 ```bash
-# Check status
+# Check status of one board, or every registered board
 sudo systemctl status esp-sniffer@ttyACM0.service
+sudo systemctl status 'esp-sniffer@*'
 
 # Stop/start the bridge by hand (deploy/flash.sh does this for you
 # automatically around a flash — see step 1)
