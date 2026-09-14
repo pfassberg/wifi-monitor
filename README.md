@@ -48,8 +48,9 @@ GPS position, altitude, speed, heading, and — when broadcast — the pilot's
 ground station position.
 
 Other management frame types (`PROBE_REQ`, `DEAUTHENTICATION`,
-`DISASSOCIATION`, `AUTHENTICATION`, `ACTION_FRAME`, `ASSOCIATION_REQ`) are
-already classified by the parser but not yet wired into a table — they're a
+`DISASSOCIATION`, `AUTHENTICATION`, `ACTION_FRAME`, `ACTION_NO_ACK`,
+`ASSOCIATION_REQ`) are already classified by the parser but not yet wired
+into a table — they're a
 starting point for extensions such as deauth-flood or rogue-AP alerting.
 
 ## Repository layout
