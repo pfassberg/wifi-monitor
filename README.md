@@ -59,7 +59,8 @@ firmware/esp32-sniffer/esp32-sniffer.ino   ESP32 promiscuous-mode sniffer (Ardui
 firmware/esp32-sniffer/fqbn.txt            Board FQBN used by deploy/flash.sh and CI
 node-red/flows.json                        The Node-RED flow (import via the editor menu)
 deploy/install.sh                          Installs the bridge + registers a udev rule per connected ESP32
-deploy/flash.sh                            Compile + flash a board via arduino-cli, no unplug/replug needed
+deploy/flash.sh                            Compile + flash a board (by device path or serial) via arduino-cli
+deploy/usb-common.sh                       Shared helper: finds connected ESP32 sniffers (used by both scripts above)
 deploy/esp_sniffer_bridge.sh               Serial → TCP bridge (runs on the Node-RED host)
 deploy/99-esp-sniffer.rules                Example udev rule (deploy/install.sh generates these for you)
 deploy/esp-sniffer@.service                systemd template unit for the bridge script
@@ -117,11 +118,18 @@ arduino-cli core install esp32:esp32
 your board/core version (`arduino-cli board details -b esp32:esp32:esp32s3`
 lists the available options) before your first flash.
 
-Once the bridge (step 2) is set up and running, flash a board with:
+Once the bridge (step 2) is set up and running, flash a board with either
+its device path or its USB serial number (both are printed by
+`deploy/install.sh`, see step 2):
 
 ```bash
 ./deploy/flash.sh /dev/ttyACM0
+./deploy/flash.sh 3C:0F:02:E4:7D:B4
 ```
+
+Flashing by serial is handy with several ESP32s on one hub, since which
+`/dev/ttyACMx` a given board lands on can shift across replugs, while its
+serial number doesn't. Matching is case-insensitive, so lowercase works too.
 
 This compiles the sketch, stops that device's `esp-sniffer@<device>.service`
 so `esptool` can access the port, flashes, and restarts the service
@@ -164,8 +172,10 @@ This copies `esp_sniffer_bridge.sh` to `/usr/local/bin`, installs the
 `esp-sniffer@.service` systemd template, and adds a udev rule for every
 ESP32 sniffer it finds currently connected (matched by USB vendor/product ID
 and each board's own serial number), then reloads udev so they start right
-away. Run it as your normal user; it calls `sudo` itself for the handful of
-steps that need root, so expect a password prompt.
+away. For each board it prints its serial number and the `/dev/ttyACMx`
+path it currently maps to — useful for `deploy/flash.sh` (step 1) or
+`systemctl status`. Run it as your normal user; it calls `sudo` itself for
+the handful of steps that need root, so expect a password prompt.
 
 **It only registers boards that are plugged in at the time you run it.**
 Got a second (or third...) ESP32 to add later? Plug it in and run
