@@ -78,13 +78,39 @@ package.json                               Node-RED dependency list (node-red-co
   when the ESP32 is plugged in (optional — you can also run
   `esp_sniffer_bridge.sh` manually).
 - [`arduino-cli`](https://arduino.github.io/arduino-cli/) with the ESP32
-  board package installed, if you're using `deploy/flash.sh` (see below).
-  The Arduino IDE works too for a one-off flash, but `deploy/flash.sh`
-  assumes `arduino-cli` since it needs to script the compile/upload.
+  board package installed, if you're using `deploy/flash.sh` (installation
+  steps in Setup, below). The Arduino IDE works too for a one-off flash, but
+  `deploy/flash.sh` assumes `arduino-cli` since it needs to script the
+  compile/upload.
 
 ## Setup
 
 ### 1. Flash the ESP32
+
+**Install `arduino-cli`:**
+
+```bash
+# Linux/macOS — installs the arduino-cli binary into ./bin
+curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
+sudo mv bin/arduino-cli /usr/local/bin/
+
+# or via Homebrew (macOS/Linux)
+brew install arduino-cli
+```
+
+Windows: `choco install arduino-cli` (Chocolatey) or `scoop install arduino-cli`
+(Scoop), or download the binary from the
+[release page](https://github.com/arduino/arduino-cli/releases/latest).
+Full instructions: [arduino-cli installation docs](https://arduino.github.io/arduino-cli/latest/installation/).
+
+Then install the ESP32 board package:
+
+```bash
+arduino-cli config init
+arduino-cli config set board_manager.additional_urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+arduino-cli core update-index
+arduino-cli core install esp32:esp32
+```
 
 `firmware/esp32-sniffer/fqbn.txt` holds the board's FQBN — check it matches
 your board/core version (`arduino-cli board details -b esp32:esp32:esp32s3`
