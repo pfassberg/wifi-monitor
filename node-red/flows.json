@@ -289,7 +289,7 @@
         "type": "function",
         "z": "3541e9805df4ac60",
         "name": "Get AP context table",
-        "func": "const apDatabase    = flow.get('apDatabase') || {};\nconst droneDatabase = flow.get('droneDatabase') || {};\n\nconst apList    = Object.values(apDatabase);\nconst droneList = Object.values(droneDatabase);\n\napList.sort((a, b) => b.rssi_latest - a.rssi_latest);\ndroneList.sort((a, b) => b.rssi - a.rssi);\n\nmsg.payload = {\n    aps: apList,\n    aps_count: apList.length,\n    drones: droneList,\n    drones_count: droneList.length\n};\n\nreturn msg;\n",
+        "func": "const apDatabase    = flow.get('apDatabase') || {};\nconst droneDatabase = flow.get('droneDatabase') || {};\n\nconst apList    = Object.values(apDatabase);\nconst droneList = Object.values(droneDatabase);\n\napList.sort((a, b) => b.rssi_latest - a.rssi_latest);\ndroneList.sort((a, b) => b.rssi - a.rssi);\n\n// Non-breaking spaces in the Last Heard timestamp so it can't wrap\n// mid-string (e.g. splitting the date from the time) in a narrow column.\n// Applied only to the display copy -- the stored apDatabase entries keep\n// plain spaces.\nconst displayApList = apList.map(ap => ({\n    ...ap,\n    last_seen_str: ap.last_seen_str.replace(/ /g, '\\u00A0')\n}));\n\nmsg.payload = {\n    aps: displayApList,\n    aps_count: apList.length,\n    drones: droneList,\n    drones_count: droneList.length\n};\n\nreturn msg;\n",
         "outputs": 1,
         "timeout": 0,
         "noerr": 0,
