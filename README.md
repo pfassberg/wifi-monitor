@@ -205,6 +205,12 @@ Node-RED fails (e.g. it's not started yet, or you're testing with something
 like `socat TCP-LISTEN:9990 -` standing in for it) — there's no backoff and
 no giving up after a while.
 
+One caveat: the bridge only discovers a dropped connection when it next
+tries to *write* to it, which only happens when new serial data arrives. In
+practice that's frequent (management frames stream in continuously), so a
+dead connection surfaces almost immediately — but if the ESP32 goes quiet
+for a while, so does the reconnect attempt, until the next frame arrives.
+
 ### 3. Import the Node-RED flow
 
 1. Install the flow's one dependency:

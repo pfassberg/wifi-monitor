@@ -18,6 +18,17 @@ ExecStart=/usr/local/bin/esp_sniffer_bridge.sh /dev/%I
 Restart=always
 RestartSec=10s
 
+# systemd ignores SIGPIPE for services by default. The bridge script's
+# self-healing depends on the opposite: a write to a dead TCP connection
+# must kill the process so Restart=always can bring it back with a fresh
+# connection. With SIGPIPE ignored, that write just fails silently (bash
+# prints "write error: Broken pipe" and moves on) and the script loops
+# forever, discarding every line -- "active (running)" but never actually
+# connected again. (The script also checks the write's exit status directly
+# and exits on failure, so this isn't the only line of defense -- but it's
+# the one that makes the original signal-based assumption true again.)
+IgnoreSIGPIPE=no
+
 # FIX: Force socat and the bash wrapper to exit instantly when stopped
 KillSignal=SIGKILL
 
