@@ -4,7 +4,9 @@
 # rule for every ESP32 sniffer currently plugged in (matched by USB serial
 # number) so each board's bridge starts automatically and independently.
 #
-# Usage: sudo ./deploy/install.sh
+# Usage: ./deploy/install.sh
+# (uses sudo itself for the steps that need root -- no need to run the
+# whole script as root)
 #
 # Safe to re-run: only boards it hasn't seen before get a new udev rule, and
 # re-copying the bridge script/systemd unit is a no-op if unchanged. Plug in
@@ -14,11 +16,6 @@ set -euo pipefail
 
 if [[ "$(uname -s)" != "Linux" ]]; then
     echo "This installer is Linux-only (needs udev/systemd)." >&2
-    exit 1
-fi
-
-if [[ $EUID -ne 0 ]]; then
-    echo "Run as root: sudo $0" >&2
     exit 1
 fi
 
@@ -35,15 +32,15 @@ VID="303a"
 PID="1001"
 
 echo "==> Installing bridge script to $BRIDGE_DEST"
-install -m 755 "$SCRIPT_DIR/esp_sniffer_bridge.sh" "$BRIDGE_DEST"
+sudo install -m 755 "$SCRIPT_DIR/esp_sniffer_bridge.sh" "$BRIDGE_DEST"
 
 echo "==> Installing systemd unit to $SERVICE_DEST"
-install -m 644 "$SCRIPT_DIR/esp-sniffer@.service" "$SERVICE_DEST"
-systemctl daemon-reload
+sudo install -m 644 "$SCRIPT_DIR/esp-sniffer@.service" "$SERVICE_DEST"
+sudo systemctl daemon-reload
 
 echo "==> Scanning for connected ESP32 sniffers ($VID:$PID)..."
 if [[ ! -f "$UDEV_RULES" ]]; then
-    echo "# Managed by deploy/install.sh -- one line per registered ESP32 sniffer." > "$UDEV_RULES"
+    echo "# Managed by deploy/install.sh -- one line per registered ESP32 sniffer." | sudo tee "$UDEV_RULES" >/dev/null
 fi
 
 found=0
@@ -60,7 +57,8 @@ for dev in /sys/bus/usb/devices/*/; do
         continue
     fi
 
-    echo "SUBSYSTEM==\"tty\", ATTRS{idVendor}==\"$VID\", ATTRS{idProduct}==\"$PID\", ATTRS{serial}==\"$serial\", TAG+=\"systemd\", ENV{SYSTEMD_WANTS}=\"esp-sniffer@%k.service\"" >> "$UDEV_RULES"
+    rule="SUBSYSTEM==\"tty\", ATTRS{idVendor}==\"$VID\", ATTRS{idProduct}==\"$PID\", ATTRS{serial}==\"$serial\", TAG+=\"systemd\", ENV{SYSTEMD_WANTS}=\"esp-sniffer@%k.service\""
+    echo "$rule" | sudo tee -a "$UDEV_RULES" >/dev/null
     echo "    + registered $serial"
     added=$((added + 1))
 done
@@ -71,8 +69,8 @@ fi
 
 if [[ "$added" -gt 0 ]]; then
     echo "==> Reloading udev rules..."
-    udevadm control --reload-rules
-    udevadm trigger
+    sudo udevadm control --reload-rules
+    sudo udevadm trigger
 fi
 
 echo "==> Done."

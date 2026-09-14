@@ -157,7 +157,7 @@ To have it start automatically whenever an ESP32 sniffer is plugged in, plug
 in your board(s) and run:
 
 ```bash
-sudo ./deploy/install.sh
+./deploy/install.sh
 ```
 
 This copies `esp_sniffer_bridge.sh` to `/usr/local/bin`, installs the
@@ -166,7 +166,8 @@ ESP32 sniffer it finds currently connected (matched by USB vendor/product ID
 and each board's own serial number), then reloads udev so they start right
 away. It's safe to re-run — boards it has already registered are left
 alone — so just plug in another ESP32 and run it again to add that one too;
-no editing udev rules by hand.
+no editing udev rules by hand. Run it as your normal user; it calls `sudo`
+itself for the handful of steps that need root, so expect a password prompt.
 
 Useful commands once installed:
 
