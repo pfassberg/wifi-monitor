@@ -460,61 +460,21 @@
         "wires": []
     },
     {
-        "id": "9ade76a3185e8cb5",
-        "type": "comment",
-        "z": "3541e9805df4ac60",
-        "name": "C++ monitoring sketch",
-        "info": "#include \"esp_wifi.h\"\n#include \"esp_log.h\"\n#include \"esp_system.h\"\n#include \"esp_event.h\" \n#include \"nvs_flash.h\" \n#include \"nvs.h\"\n#include \"freertos/FreeRTOS.h\"\n#include \"freertos/task.h\"\n#include \"freertos/queue.h\"\n\n// =========================================================================\n// PRODUCTION WORKSPACE OVERRIDES\n// =========================================================================\n#define SNIFFER_MAGIC 0x5046      // \"PF\" - Personal verification security key\n#define STORAGE_VERSION 1\n#define TARGET_CPU_SPEED_MHZ 80   // Low-power 80MHz clock bounds for lower heat\n// =========================================================================\n\nvolatile bool is_scanning = false;\nvolatile uint8_t min_chan = 1;\nvolatile uint8_t max_chan = 14;          \nvolatile uint8_t current_chan = 1;\n\n#define MAX_FRAME_LEN 512\nstruct PacketData {\n    uint16_t length;\n    uint8_t channel;\n    int8_t rssi; \n    uint8_t payload[MAX_FRAME_LEN];\n};\n\nQueueHandle_t packet_queue = nullptr;\nTickType_t last_hop_time = 0;\n\ninline void perform_channel_hop() {\n    current_chan++;\n    if (current_chan > max_chan || current_chan < min_chan) {\n        current_chan = min_chan;\n    }\n    esp_wifi_set_channel(current_chan, WIFI_SECOND_CHAN_NONE);\n    last_hop_time = xTaskGetTickCount();\n}\n\nvoid save_channels_to_nvs(uint8_t min_ch, uint8_t max_ch) {\n    nvs_handle_t my_handle;\n    if (nvs_open(\"sniffer_conf\", NVS_READWRITE, &my_handle) == ESP_OK) {\n        nvs_set_u16(my_handle, \"magic\", SNIFFER_MAGIC);\n        nvs_set_u8(my_handle, \"version\", STORAGE_VERSION);\n        nvs_set_u8(my_handle, \"min_chan\", min_ch);\n        nvs_set_u8(my_handle, \"max_chan\", max_ch);\n        nvs_commit(my_handle);\n        nvs_close(my_handle);\n    }\n}\n\nvoid load_channels_from_nvs() {\n    nvs_handle_t my_handle;\n    uint16_t stored_magic = 0;\n    uint8_t stored_version = 0;\n\n    if (nvs_open(\"sniffer_conf\", NVS_READONLY, &my_handle) == ESP_OK) {\n        nvs_get_u16(my_handle, \"magic\", &stored_magic);\n        nvs_get_u8(my_handle, \"version\", &stored_version);\n\n        if (stored_magic == SNIFFER_MAGIC && stored_version == STORAGE_VERSION) {\n            nvs_get_u8(my_handle, \"min_chan\", (uint8_t *)&min_chan);\n            nvs_get_u8(my_handle, \"max_chan\", (uint8_t *)&max_chan);\n        } else {\n            min_chan = 1;\n            max_chan = 14;\n            nvs_close(my_handle);\n            save_channels_to_nvs(min_chan, max_chan);\n            return;\n        }\n        nvs_close(my_handle);\n    } else {\n        min_chan = 1;\n        max_chan = 14;\n        save_channels_to_nvs(min_chan, max_chan);\n    }\n}\n\nvoid wifi_packet_cb(void *buf, wifi_promiscuous_pkt_type_t type) {\n    if (type != WIFI_PKT_MGMT || packet_queue == nullptr || !is_scanning) return;\n\n    wifi_promiscuous_pkt_t *pkt = (wifi_promiscuous_pkt_t *)buf;\n    uint16_t len = pkt->rx_ctrl.sig_len;\n    if (len > MAX_FRAME_LEN) len = MAX_FRAME_LEN;\n\n    PacketData data;\n    data.length = len;\n    \n    // HARDWARE REG FIX: Trust the physical radio register to stop channel bleeding artifacts\n    data.channel = pkt->rx_ctrl.channel; \n    \n    data.rssi = pkt->rx_ctrl.rssi; \n    memcpy(data.payload, pkt->payload, len);\n\n    xQueueSendFromISR(packet_queue, &data, NULL);\n}\n\nvoid parse_serial_command(String cmd) {\n    cmd.trim();\n    if (cmd.length() == 0) return;\n\n    if (cmd.equalsIgnoreCase(\"reset\")) {\n        Serial.println(\"[SYSTEM] Rebooting...\");\n        delay(200);\n        esp_restart();\n    } \n    else if (cmd.startsWith(\"channel \")) {\n        String range = cmd.substring(8);\n        range.trim();\n        \n        uint8_t new_min = 1;\n        uint8_t new_max = 14;\n        bool valid = false;\n\n        int dash_idx = range.indexOf('-');\n        if (dash_idx != -1) {\n            new_min = range.substring(0, dash_idx).toInt();\n            new_max = range.substring(dash_idx + 1).toInt();\n            if (new_min >= 1 && new_max <= 14 && new_min <= new_max) {\n                valid = true;\n            }\n        } else {\n            new_min = range.toInt();\n            new_max = new_min;\n            if (new_min >= 1 && new_min <= 14) {\n                valid = true;\n            }\n        }\n\n        if (valid) {\n            min_chan = new_min;\n            max_chan = new_max;\n            current_chan = min_chan;\n\n            esp_wifi_set_channel(current_chan, WIFI_SECOND_CHAN_NONE);\n            last_hop_time = xTaskGetTickCount();\n\n            save_channels_to_nvs(min_chan, max_chan);\n\n            if (min_chan == max_chan) {\n                Serial.printf(\"[SYSTEM] Range adjusted. Static tuned to channel %d\\n\", min_chan);\n            } else {\n                Serial.printf(\"[SYSTEM] Range adjusted. Scan span changed to %d-%d\\n\", min_chan, max_chan);\n            }\n        } else {\n            Serial.println(\"[ERROR] Parameter error. Use 'channel X' or 'channel X-Y' (1-14)\");\n        }\n    }\n}\n\nvoid sniffer_worker_task(void *pvParameters) {\n    last_hop_time = xTaskGetTickCount();\n    PacketData dequeued_pkt;\n\n    while (is_scanning) {\n        if (min_chan != max_chan && (xTaskGetTickCount() - last_hop_time) >= pdMS_TO_TICKS(300)) {\n            perform_channel_hop();\n        }\n\n        uint8_t packets_drained = 0;\n        while (packets_drained < 5 && xQueueReceive(packet_queue, &dequeued_pkt, 0) == pdTRUE) {\n            packets_drained++;\n\n            float current_temp = temperatureRead();\n\n            Serial.printf(\"[MGMT][LEN:%d][CHAN:%d][RSSI:%d][INT_TEMP:%.1fC][DATA:\", \n                          dequeued_pkt.length, dequeued_pkt.channel, dequeued_pkt.rssi, current_temp);\n            \n            for (uint16_t i = 0; i < dequeued_pkt.length; i++) {\n                Serial.printf(\"%02X\", dequeued_pkt.payload[i]);\n            }\n            Serial.print(\"]\\n\");\n\n            if (min_chan != max_chan && (xTaskGetTickCount() - last_hop_time) >= pdMS_TO_TICKS(300)) {\n                perform_channel_hop();\n            }\n        }\n\n        if (Serial.available() > 0) {\n            String incoming = Serial.readStringUntil('\\n');\n            parse_serial_command(incoming);\n        }\n        \n        vTaskDelay(pdMS_TO_TICKS(2));\n    }\n    vTaskDelete(NULL);\n}\n\nvoid setup() {\n    // Lock in power savings early at the boot initialization block\n    setCpuFrequencyMhz(TARGET_CPU_SPEED_MHZ);\n    Serial.begin(115200);\n\n    esp_event_loop_create_default(); \n\n    esp_err_t ret = nvs_flash_init();\n    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {\n        nvs_flash_erase();\n        nvs_flash_init();\n    }\n    \n    load_channels_from_nvs();\n    current_chan = min_chan;\n\n    packet_queue = xQueueCreate(40, sizeof(PacketData)); \n    is_scanning = true;\n\n    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();\n    esp_wifi_init(&cfg);\n    esp_wifi_set_mode(WIFI_MODE_NULL); \n    esp_wifi_start();\n\n    wifi_promiscuous_filter_t filter = { .filter_mask = WIFI_PROMIS_FILTER_MASK_MGMT };\n    esp_wifi_set_promiscuous_filter(&filter);\n    esp_wifi_set_promiscuous_rx_cb(&wifi_packet_cb);\n    esp_wifi_set_promiscuous(true);\n    esp_wifi_set_channel(current_chan, WIFI_SECOND_CHAN_NONE);\n    \n    xTaskCreatePinnedToCore(sniffer_worker_task, \"sniffer_worker\", 4096, NULL, 5, NULL, 1);\n}\n\nvoid loop() {}\n",
-        "x": 180,
-        "y": 880,
-        "wires": []
-    },
-    {
-        "id": "c92fce1e19c896a8",
-        "type": "comment",
-        "z": "3541e9805df4ac60",
-        "name": "/usr/local/bin/esp_sniffer_bridge.sh",
-        "info": "#!/bin/bash\nDEVICE=$1\nNODE_RED_IP=\"127.0.0.1\"\nNODE_RED_PORT=9990\n\nif [ -z \"$DEVICE\" ]; then\n    echo \"[ERROR] Device path argument required.\"\n    exit 1\nfi\n\n# Apply clean hardware line constraints\nstty -F \"$DEVICE\" 115200 cs8 hupcl -clocal -crtscts\n\n# -u forces unidirectional tracking. -T 10 triggers an exit if data drops for 10 seconds.\nsocat -u -T 10 \"$DEVICE,b115200,raw,echo=0\" - | while read -r line; do\n    if [[ -n \"$line\" ]]; then\n        # Leverages Bash's built-in memory string mapping instead of heavy process forking\n        echo \"[TS:${EPOCHREALTIME}] ${line}\"\n    fi\ndone > \"/dev/tcp/${NODE_RED_IP}/${NODE_RED_PORT}\" 2>/dev/null\n",
-        "x": 220,
-        "y": 940,
-        "wires": []
-    },
-    {
-        "id": "4332f123c9b8120a",
-        "type": "comment",
-        "z": "3541e9805df4ac60",
-        "name": "/etc/udev/rules.d/99-esp-sniffer.rules",
-        "info": "SUBSYSTEM==\"tty\", ATTRS{idVendor}==\"303a\", ATTRS{idProduct}==\"1001\", ATTRS{serial}==\"3C:0F:02:E4:7D:B4\", TAG+=\"systemd\", ENV{SYSTEMD_WANTS}=\"esp-sniffer@%k.service\"\n",
-        "x": 220,
-        "y": 1000,
-        "wires": []
-    },
-    {
-        "id": "845db38bb67edad3",
-        "type": "comment",
-        "z": "3541e9805df4ac60",
-        "name": "Commands",
-        "info": "# Activate udev rules:\nsudo udevadm control --reload-rules && sudo udevadm trigger\n\n# Activate systemd script\nsudo systemctl daemon-reload\n\n# Compile + flash a board and restart its bridge service automatically\n# (no need to stop it or unplug/replug by hand -- see deploy/flash.sh):\n./deploy/flash.sh /dev/ttyACM0\n\n# Show status of socat process\nsudo systemctl status esp-sniffer@ttyACM0.service\n",
-        "x": 150,
-        "y": 1120,
-        "wires": []
-    },
-    {
-        "id": "3793dc2e1927e2b2",
-        "type": "comment",
-        "z": "3541e9805df4ac60",
-        "name": "/etc/systemd/system/esp-sniffer@.service",
-        "info": "[Unit]\nDescription=ESP-Sniffer Pure Bash Self-Healing Service on %I\nBindsTo=dev-%i.device\nAfter=dev-%i.device\n\n[Service]\nType=simple\nExecStart=/usr/local/bin/esp_sniffer_bridge.sh /dev/%I\nRestart=always\nRestartSec=2s\n\n# FIX: Force socat and the bash wrapper to exit instantly when stopped\nKillSignal=SIGKILL\n\n[Install]\nWantedBy=multi-user.target\n",
-        "x": 240,
-        "y": 1060,
-        "wires": []
-    },
-    {
         "id": "ec4d6be0e451afcd",
         "type": "global-config",
         "env": [],
         "modules": {
             "node-red-contrib-msg-speed": "2.1.0"
         }
+    },
+    {
+        "id": "c909947f82b09ca8",
+        "type": "comment",
+        "z": "3541e9805df4ac60",
+        "name": "Project repository",
+        "info": "This flow is one part of the wifi-monitor project -- the ESP32 firmware, host-side deploy scripts (bridge, systemd unit, udev rule, install/flash tooling), and full setup docs live in the GitHub repo, not in comment nodes here:\n\nhttps://github.com/pfassberg/wifi-monitor",
+        "x": 180,
+        "y": 880,
+        "wires": []
     }
 ]
