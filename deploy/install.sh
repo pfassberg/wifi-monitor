@@ -25,11 +25,12 @@ if ! command -v socat >/dev/null; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=deploy/usb-common.sh
+source "$SCRIPT_DIR/usb-common.sh"
+
 BRIDGE_DEST="/usr/local/bin/esp_sniffer_bridge.sh"
 SERVICE_DEST="/etc/systemd/system/esp-sniffer@.service"
 UDEV_RULES="/etc/udev/rules.d/99-esp-sniffer.rules"
-VID="303a"
-PID="1001"
 
 echo "==> Installing bridge script to $BRIDGE_DEST"
 sudo install -m 755 "$SCRIPT_DIR/esp_sniffer_bridge.sh" "$BRIDGE_DEST"
@@ -38,30 +39,28 @@ echo "==> Installing systemd unit to $SERVICE_DEST"
 sudo install -m 644 "$SCRIPT_DIR/esp-sniffer@.service" "$SERVICE_DEST"
 sudo systemctl daemon-reload
 
-echo "==> Scanning for connected ESP32 sniffers ($VID:$PID)..."
+echo "==> Scanning for connected ESP32 sniffers ($ESP_SNIFFER_VID:$ESP_SNIFFER_PID)..."
 if [[ ! -f "$UDEV_RULES" ]]; then
     echo "# Managed by deploy/install.sh -- one line per registered ESP32 sniffer." | sudo tee "$UDEV_RULES" >/dev/null
 fi
 
 found=0
 added=0
-for dev in /sys/bus/usb/devices/*/; do
-    [[ -f "${dev}idVendor" && -f "${dev}idProduct" && -f "${dev}serial" ]] || continue
-    [[ "$(cat "${dev}idVendor")" == "$VID" && "$(cat "${dev}idProduct")" == "$PID" ]] || continue
-
-    serial="$(cat "${dev}serial")"
+while IFS='|' read -r serial ttyname _syspath; do
     found=$((found + 1))
+    device="${ttyname:+/dev/$ttyname}"
+    device="${device:-unknown, no tty node found}"
 
     if grep -qF "ATTRS{serial}==\"$serial\"" "$UDEV_RULES"; then
-        echo "    - $serial already registered"
+        echo "    - $serial ($device) already registered"
         continue
     fi
 
-    rule="SUBSYSTEM==\"tty\", ATTRS{idVendor}==\"$VID\", ATTRS{idProduct}==\"$PID\", ATTRS{serial}==\"$serial\", TAG+=\"systemd\", ENV{SYSTEMD_WANTS}=\"esp-sniffer@%k.service\""
+    rule="SUBSYSTEM==\"tty\", ATTRS{idVendor}==\"$ESP_SNIFFER_VID\", ATTRS{idProduct}==\"$ESP_SNIFFER_PID\", ATTRS{serial}==\"$serial\", TAG+=\"systemd\", ENV{SYSTEMD_WANTS}=\"esp-sniffer@%k.service\""
     echo "$rule" | sudo tee -a "$UDEV_RULES" >/dev/null
-    echo "    + registered $serial"
+    echo "    + registered $serial ($device)"
     added=$((added + 1))
-done
+done < <(find_esp32_devices)
 
 if [[ "$found" -eq 0 ]]; then
     echo "    No ESP32 sniffer currently connected. Plug one in (or more) and re-run this script to register it."
@@ -75,3 +74,5 @@ fi
 
 echo "==> Done."
 echo "    Check status with: systemctl status 'esp-sniffer@*'"
+echo "    Flash a board with either its device path or serial number shown above, e.g.:"
+echo "        ./deploy/flash.sh /dev/ttyACM0"
