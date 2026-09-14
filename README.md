@@ -200,6 +200,11 @@ sudo systemctl start esp-sniffer@ttyACM0.service
 Without udev/systemd, you can just run the script by hand:
 `./deploy/esp_sniffer_bridge.sh /dev/ttyACM0`.
 
+The service retries every 2 seconds, indefinitely, if the TCP connection to
+Node-RED fails (e.g. it's not started yet, or you're testing with something
+like `socat TCP-LISTEN:9990 -` standing in for it) — there's no backoff and
+no giving up after a while.
+
 ### 3. Import the Node-RED flow
 
 1. Install the flow's one dependency:

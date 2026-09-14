@@ -3,6 +3,14 @@ Description=ESP-Sniffer Pure Bash Self-Healing Service on %I
 BindsTo=dev-%i.device
 After=dev-%i.device
 
+# Without this, systemd's default anti-flapping limit (5 restarts within any
+# 10s window) kicks in: a real outage (Node-RED down, TCP connection
+# refused) fails near-instantly, so RestartSec=2s alone burns through that
+# budget in ~10s and systemd then stops restarting the unit at all -- no
+# more retries until something manually restarts it. 0 disables that limit,
+# so Restart=always actually means "forever", matching this unit's name.
+StartLimitIntervalSec=0
+
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/esp_sniffer_bridge.sh /dev/%I
