@@ -164,10 +164,15 @@ This copies `esp_sniffer_bridge.sh` to `/usr/local/bin`, installs the
 `esp-sniffer@.service` systemd template, and adds a udev rule for every
 ESP32 sniffer it finds currently connected (matched by USB vendor/product ID
 and each board's own serial number), then reloads udev so they start right
-away. It's safe to re-run — boards it has already registered are left
-alone — so just plug in another ESP32 and run it again to add that one too;
-no editing udev rules by hand. Run it as your normal user; it calls `sudo`
-itself for the handful of steps that need root, so expect a password prompt.
+away. Run it as your normal user; it calls `sudo` itself for the handful of
+steps that need root, so expect a password prompt.
+
+**It only registers boards that are plugged in at the time you run it.**
+Got a second (or third...) ESP32 to add later? Plug it in and run
+`./deploy/install.sh` again — it's safe to re-run any time, since boards
+already registered are left alone. You shouldn't need to hand-edit the udev
+rules file yourself; if you find yourself doing that, it almost always means
+that board wasn't plugged in yet on the last run.
 
 Useful commands once installed:
 
