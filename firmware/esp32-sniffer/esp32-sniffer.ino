@@ -14,23 +14,34 @@
 #define SNIFFER_MAGIC 0x5046      // "PF" - Personal verification security key
 #define STORAGE_VERSION 1
 #define TARGET_CPU_SPEED_MHZ 80   // Low-power 80MHz clock bounds for lower heat
+
+// Guard window after every esp_wifi_set_channel() call. Right at a hop
+// boundary, a frame can be reported on the channel being switched to (or
+// from) rather than the one it actually arrived on -- most visible between
+// adjacent, heavily-overlapping 2.4GHz channels (e.g. 11 reported as 12).
+// Dropping captures for a few ms after each hop lets the RF settle before
+// pkt->rx_ctrl.channel is trusted. This is the other half of the "trust the
+// hardware register" fix below: that one stops a *stale* software channel
+// variable from being reported; this one stops the register itself from
+// being read mid-transition.
+#define CHANNEL_SETTLE_MS 5
 // =========================================================================
 
 volatile bool is_scanning = false;
 volatile uint8_t min_chan = 1;
-volatile uint8_t max_chan = 14;          
+volatile uint8_t max_chan = 14;
 volatile uint8_t current_chan = 1;
 
 #define MAX_FRAME_LEN 512
 struct PacketData {
     uint16_t length;
     uint8_t channel;
-    int8_t rssi; 
+    int8_t rssi;
     uint8_t payload[MAX_FRAME_LEN];
 };
 
 QueueHandle_t packet_queue = nullptr;
-TickType_t last_hop_time = 0;
+volatile TickType_t last_hop_time = 0; // read from ISR context too, hence volatile
 
 inline void perform_channel_hop() {
     current_chan++;
@@ -82,6 +93,12 @@ void load_channels_from_nvs() {
 
 void wifi_packet_cb(void *buf, wifi_promiscuous_pkt_type_t type) {
     if (type != WIFI_PKT_MGMT || packet_queue == nullptr || !is_scanning) return;
+
+    // Runs in WiFi RX ISR context, so the ISR-safe tick call is required --
+    // see CHANNEL_SETTLE_MS above for why this check exists at all.
+    if ((xTaskGetTickCountFromISR() - last_hop_time) < pdMS_TO_TICKS(CHANNEL_SETTLE_MS)) {
+        return;
+    }
 
     wifi_promiscuous_pkt_t *pkt = (wifi_promiscuous_pkt_t *)buf;
     uint16_t len = pkt->rx_ctrl.sig_len;
