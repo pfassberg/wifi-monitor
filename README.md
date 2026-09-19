@@ -151,6 +151,15 @@ Serial commands (type into the same serial connection):
 
 The channel range is persisted to NVS and restored on the next boot.
 
+After every channel switch, captures are dropped for `CHANNEL_SETTLE_MS`
+(5 ms by default, near the top of the sketch) before the reported channel
+is trusted — right at a hop boundary the hardware can briefly report the
+channel being switched to/from rather than the one a frame actually
+arrived on, most visible between adjacent 2.4GHz channels (e.g. an AP on
+11 occasionally showing up as 12). Raise it if you still see
+misattributed channels; it costs a small, fixed slice of each 300 ms
+dwell either way.
+
 `.github/workflows/firmware-build.yml` compiles the sketch on every push/PR
 that touches `firmware/`, as a build-only check — GitHub-hosted runners have
 no USB access to real hardware, so flashing still has to happen locally via
