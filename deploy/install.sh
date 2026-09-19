@@ -43,7 +43,7 @@ sudo systemctl daemon-reload
 if [[ ! -f "$ENV_FILE" ]]; then
     echo "==> Writing default config to $ENV_FILE"
     sudo install -d -m 755 "$(dirname "$ENV_FILE")"
-    printf '# Node-RED host the bridge forwards captures to. Only needed if it is not\n# on this machine -- edit and restart the bridge service(s) to apply.\nNODE_RED_IP=127.0.0.1\n' | sudo tee "$ENV_FILE" >/dev/null
+    printf '# Node-RED host/port the bridge forwards captures to. Only needed if\n# either differs from the defaults below -- edit and restart the bridge\n# service(s) to apply. NODE_RED_PORT must match the TCP-in node'"'"'s port\n# in the Node-RED flow.\nNODE_RED_IP=127.0.0.1\nNODE_RED_PORT=9990\n' | sudo tee "$ENV_FILE" >/dev/null
 else
     echo "==> $ENV_FILE already exists, leaving it alone"
 fi

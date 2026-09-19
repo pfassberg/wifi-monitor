@@ -1,10 +1,11 @@
 #!/bin/bash
 DEVICE=$1
-# Overridable via the environment -- deploy/install.sh wires this up through
-# /etc/esp-sniffer/env (see deploy/esp-sniffer@.service's EnvironmentFile)
-# for setups where Node-RED isn't running on the same host as the bridge.
+# Overridable via the environment -- deploy/install.sh wires these up
+# through /etc/esp-sniffer/env (see deploy/esp-sniffer@.service's
+# EnvironmentFile) for setups where Node-RED isn't running on the same
+# host as the bridge, or isn't listening on the default port.
 NODE_RED_IP="${NODE_RED_IP:-127.0.0.1}"
-NODE_RED_PORT=9990
+NODE_RED_PORT="${NODE_RED_PORT:-9990}"
 
 if [ -z "$DEVICE" ]; then
     echo "[ERROR] Device path argument required."
