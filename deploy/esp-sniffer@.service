@@ -14,6 +14,11 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=simple
+# Optional: deploy/install.sh creates this once with NODE_RED_IP=127.0.0.1
+# and never overwrites it again, so a customized IP (Node-RED on a
+# different host) survives re-running install.sh. The leading "-" means
+# it's fine if the file doesn't exist.
+EnvironmentFile=-/etc/esp-sniffer/env
 ExecStart=/usr/local/bin/esp_sniffer_bridge.sh /dev/%I
 Restart=always
 RestartSec=10s

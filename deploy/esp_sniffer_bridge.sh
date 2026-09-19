@@ -1,6 +1,9 @@
 #!/bin/bash
 DEVICE=$1
-NODE_RED_IP="127.0.0.1"
+# Overridable via the environment -- deploy/install.sh wires this up through
+# /etc/esp-sniffer/env (see deploy/esp-sniffer@.service's EnvironmentFile)
+# for setups where Node-RED isn't running on the same host as the bridge.
+NODE_RED_IP="${NODE_RED_IP:-127.0.0.1}"
 NODE_RED_PORT=9990
 
 if [ -z "$DEVICE" ]; then

@@ -31,6 +31,7 @@ source "$SCRIPT_DIR/usb-common.sh"
 BRIDGE_DEST="/usr/local/bin/esp_sniffer_bridge.sh"
 SERVICE_DEST="/etc/systemd/system/esp-sniffer@.service"
 UDEV_RULES="/etc/udev/rules.d/99-esp-sniffer.rules"
+ENV_FILE="/etc/esp-sniffer/env"
 
 echo "==> Installing bridge script to $BRIDGE_DEST"
 sudo install -m 755 "$SCRIPT_DIR/esp_sniffer_bridge.sh" "$BRIDGE_DEST"
@@ -38,6 +39,14 @@ sudo install -m 755 "$SCRIPT_DIR/esp_sniffer_bridge.sh" "$BRIDGE_DEST"
 echo "==> Installing systemd unit to $SERVICE_DEST"
 sudo install -m 644 "$SCRIPT_DIR/esp-sniffer@.service" "$SERVICE_DEST"
 sudo systemctl daemon-reload
+
+if [[ ! -f "$ENV_FILE" ]]; then
+    echo "==> Writing default config to $ENV_FILE"
+    sudo install -d -m 755 "$(dirname "$ENV_FILE")"
+    printf '# Node-RED host the bridge forwards captures to. Only needed if it is not\n# on this machine -- edit and restart the bridge service(s) to apply.\nNODE_RED_IP=127.0.0.1\n' | sudo tee "$ENV_FILE" >/dev/null
+else
+    echo "==> $ENV_FILE already exists, leaving it alone"
+fi
 
 echo "==> Scanning for connected ESP32 sniffers ($ESP_SNIFFER_VID:$ESP_SNIFFER_PID)..."
 if [[ ! -f "$UDEV_RULES" ]]; then
