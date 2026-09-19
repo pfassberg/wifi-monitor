@@ -201,6 +201,9 @@ Useful commands once installed:
 sudo systemctl status esp-sniffer@ttyACM0.service
 sudo systemctl status 'esp-sniffer@*'
 
+# Tail its logs, e.g. to see why it's crash-looping
+sudo journalctl -u esp-sniffer@ttyACM0.service -n 50 --no-pager
+
 # Stop/start the bridge by hand (deploy/flash.sh does this for you
 # automatically around a flash — see step 1)
 sudo systemctl stop esp-sniffer@ttyACM0.service
