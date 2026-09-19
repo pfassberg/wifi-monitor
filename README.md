@@ -169,8 +169,8 @@ no USB access to real hardware, so flashing still has to happen locally via
 
 `deploy/esp_sniffer_bridge.sh` reads an ESP32's serial port, prefixes each
 line with a `[TS:<unix-epoch>]` timestamp, and forwards it to Node-RED over
-TCP on port 9990. It defaults to `127.0.0.1`, i.e. Node-RED running on the
-same host as the bridge.
+TCP. It defaults to `127.0.0.1:9990`, i.e. Node-RED running on the same
+host as the bridge, listening on its default port.
 
 To have it start automatically whenever an ESP32 sniffer is plugged in, plug
 in your board(s) and run:
@@ -195,17 +195,23 @@ already registered are left alone. You shouldn't need to hand-edit the udev
 rules file yourself; if you find yourself doing that, it almost always means
 that board wasn't plugged in yet on the last run.
 
-If Node-RED runs on a different host, set `NODE_RED_IP` in
-`/etc/esp-sniffer/env` (created on first install, defaulting to
-`127.0.0.1`) and restart the bridge service(s) to apply it:
+If Node-RED runs on a different host or port, set `NODE_RED_IP`/
+`NODE_RED_PORT` in `/etc/esp-sniffer/env` (created on first install,
+defaulting to `127.0.0.1`/`9990`) and restart the bridge service(s) to
+apply it:
 
 ```bash
 sudo sed -i 's/^NODE_RED_IP=.*/NODE_RED_IP=192.168.1.50/' /etc/esp-sniffer/env
+sudo sed -i 's/^NODE_RED_PORT=.*/NODE_RED_PORT=9991/' /etc/esp-sniffer/env
 sudo systemctl restart 'esp-sniffer@*'
 ```
 
-Don't edit `/usr/local/bin/esp_sniffer_bridge.sh` directly to change the
-IP — re-running `install.sh` overwrites that file, but never touches
+A non-default port also needs to match the port field of the "TCP in"
+node in the Node-RED flow (step 3, below) — the bridge and Node-RED have
+to agree on it independently.
+
+Don't edit `/usr/local/bin/esp_sniffer_bridge.sh` directly to change
+either — re-running `install.sh` overwrites that file, but never touches
 `/etc/esp-sniffer/env` once it exists.
 
 Useful commands once installed:
