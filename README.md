@@ -139,8 +139,10 @@ This compiles the sketch, stops that device's `esp-sniffer@<device>.service`
 so `esptool` can access the port, flashes, and restarts the service
 afterwards — no manual `systemctl stop`/unplug-replug cycle needed, and it
 works the same way regardless of how many ESP32s are on the hub, since it
-only touches the one device you pass it. Before the bridge is set up, or for
-a one-off flash, `arduino-cli upload`/the Arduino IDE work as normal.
+only touches the one device you pass it. If the bridge service isn't running
+for that device (e.g. before the bridge is set up), the script skips the
+stop/restart and just flashes. For a one-off flash, `arduino-cli upload`/the
+Arduino IDE work as normal.
 
 The sketch boots into promiscuous mode immediately, hopping channels 1–14
 every 300 ms, and streams captured management frames on the USB serial port

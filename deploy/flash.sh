@@ -41,9 +41,15 @@ SERVICE="esp-sniffer@$(basename "$DEVICE").service"
 echo "==> Compiling ($FQBN)..."
 arduino-cli compile --fqbn "$FQBN" "$SKETCH_DIR"
 
-echo "==> Stopping $SERVICE..."
-sudo systemctl stop "$SERVICE"
-trap 'echo "==> Restarting $SERVICE..."; sudo systemctl start "$SERVICE"' EXIT
+# Only touch the bridge if it's actually running on this host -- it's
+# optional, and without it there's nothing holding the port open.
+if systemctl is-active --quiet "$SERVICE"; then
+    echo "==> Stopping $SERVICE..."
+    sudo systemctl stop "$SERVICE"
+    trap 'echo "==> Restarting $SERVICE..."; sudo systemctl start "$SERVICE"' EXIT
+else
+    echo "==> $SERVICE not running, flashing without stopping it."
+fi
 
 echo "==> Flashing $DEVICE..."
 arduino-cli upload -p "$DEVICE" --fqbn "$FQBN" "$SKETCH_DIR" "$@"
