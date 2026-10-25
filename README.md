@@ -37,7 +37,10 @@ Node-RED, which does all of the parsing, state-keeping, and rendering.
 ### What's tracked today
 
 The **Access Points** tab is built from `BEACON` and `PROBE_RESP` frames:
-SSID, BSSID, channel, RSSI, encryption (Open/OWE/WPA/WPA2/WPA3/transition),
+SSID, BSSID, channel (as advertised by the AP itself in its DS Parameter
+Set / HT Operation element, falling back to the radio's receive channel only
+when the frame carries neither), RSSI, encryption
+(Open/OWE/WPA/WPA2/WPA3/transition),
 WPS status (including a "pairing in progress" state), inferred AP boot time
 and uptime (derived from the 802.11 TSF timer), and first/last-seen
 timestamps.
@@ -159,6 +162,12 @@ arrived on, most visible between adjacent 2.4GHz channels (e.g. an AP on
 11 occasionally showing up as 12). Raise it if you still see
 misattributed channels; it costs a small, fixed slice of each 300 ms
 dwell either way.
+
+In practice this guard alone isn't enough: adjacent 2.4GHz channels overlap
+so heavily that a beacon is genuinely received while tuned one channel off.
+That's why the Access Points table shows the channel the AP advertises in
+the beacon rather than the receive channel (which is kept as `rx_channel`
+in the parsed payload, for diagnostics).
 
 `.github/workflows/firmware-build.yml` compiles the sketch on every push/PR
 that touches `firmware/`, as a build-only check — GitHub-hosted runners have
